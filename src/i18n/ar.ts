@@ -1,0 +1,120 @@
+export const ar = {
+  // App
+  appName: 'ذبائح عيد الأضحى',
+  
+  // Navigation
+  dashboard: 'لوحة التحكم',
+  customers: 'المشتركين',
+  cows: 'الأبقار',
+  distribution: 'التوزيع',
+  results: 'النتائج',
+  
+  // Dashboard
+  totalCustomers: 'إجمالي المشتركين',
+  totalCows: 'إجمالي الأبقار',
+  totalShares: 'إجمالي الأسهم',
+  availableShares: 'الأسهم المتاحة',
+  completeCows: 'بقرة مكتملة',
+  pendingDistribution: 'في انتظار التوزيع',
+  quickActions: 'إجراءات سريعة',
+  addCustomer: 'إضافة مشترك',
+  addCow: 'إضافة بقرة',
+  startDistribution: 'بدء التوزيع',
+  viewResults: 'عرض النتائج',
+  recentActivity: 'النشاط الأخير',
+  
+  // Customer
+  customerName: 'اسم المشترك',
+  phone: 'رقم الهاتف',
+  address: 'العنوان',
+  shares: 'عدد الأسهم',
+  requestedParts: 'الأجزاء المطلوبة',
+  assignedCow: 'البقرة المخصصة',
+  notes: 'ملاحظات',
+  editCustomer: 'تعديل المشترك',
+  deleteCustomer: 'حذف المشترك',
+  customerDetails: 'تفاصيل المشترك',
+  noCustomers: 'لا يوجد مشتركين بعد',
+  noCustomersDesc: 'أضف أول مشترك لبدء إدارة التوزيع',
+  searchCustomers: 'البحث عن مشترك...',
+  
+  // Cow
+  cowName: 'اسم/رقم البقرة',
+  totalSharesCow: 'عدد الأسهم',
+  takenShares: 'الأسهم الموزعة',
+  remainingShares: 'الأسهم المتبقية',
+  cowStatus: 'الحالة',
+  available: 'متاح',
+  complete: 'مكتمل',
+  editCow: 'تعديل البقرة',
+  deleteCow: 'حذف البقرة',
+  cowDetails: 'تفاصيل البقرة',
+  noCows: 'لا يوجد أبقار بعد',
+  noCowsDesc: 'أضف أول بقرة لبدء تسجيل الذبائح',
+  subscribers: 'المشتركون',
+  
+  // Parts
+  meat: 'لحم',
+  liver: 'كبدة',
+  kidney: 'كلاوي',
+  heart: 'قلب',
+  spleen: 'طحال',
+  tripe: 'كرشة',
+  lungs: 'رئة',
+  intestines: 'ممبار',
+  frontLeg: 'رجل أمامية',
+  backLeg: 'رجل خلفية',
+  head: 'رأس',
+  selectParts: 'اختر الأجزاء المطلوبة',
+  weight: 'الوزن (كجم)',
+  
+  // Distribution
+  startDistributionBtn: 'ابدأ التوزيع التلقائي',
+  distributionWarnings: 'تحذيرات التوزيع',
+  noWarnings: 'لا توجد تحذيرات',
+  distributionComplete: 'تم التوزيع بنجاح',
+  redistributeAll: 'إعادة التوزيع',
+  clearResults: 'مسح النتائج',
+  
+  // Results
+  exportPdf: 'تصدير PDF',
+  exportJson: 'نسخة احتياطية',
+  importJson: 'استيراد بيانات',
+  shareWhatsapp: 'مشاركة عبر واتساب',
+  printCard: 'طباعة بطاقة',
+  noResults: 'لا توجد نتائج بعد',
+  noResultsDesc: 'قم بتشغيل التوزيع أولاً من شاشة التوزيع',
+  cowSummary: 'ملخص البقرة',
+  customerCard: 'بطاقة المشترك',
+  
+  // Common
+  save: 'حفظ',
+  cancel: 'إلغاء',
+  delete: 'حذف',
+  edit: 'تعديل',
+  add: 'إضافة',
+  confirm: 'تأكيد',
+  back: 'رجوع',
+  search: 'بحث',
+  filter: 'تصفية',
+  all: 'الكل',
+  yes: 'نعم',
+  no: 'لا',
+  ok: 'موافق',
+  loading: 'جاري التحميل...',
+  error: 'حدث خطأ',
+  success: 'تمت العملية بنجاح',
+  required: 'حقل مطلوب',
+  
+  // Warnings
+  shortageWarning: 'نقص في {part}: يطلبه {demand} أشخاص، المتاح {supply} فقط',
+  exclusiveWarning: '{part} حصري: شخص واحد فقط لكل بقرة',
+  noCustomersAssigned: 'لا يوجد مشتركين مخصصين لأي بقرة',
+  unassignedCustomers: '{count} مشتركين بدون بقرة مخصصة',
+  
+  // Confirmation
+  confirmDelete: 'هل أنت متأكد من الحذف؟',
+  confirmDeleteDesc: 'لا يمكن التراجع عن هذا الإجراء',
+  confirmDistribution: 'هل تريد بدء التوزيع؟',
+  confirmDistributionDesc: 'سيتم توزيع الأجزاء تلقائياً حسب الطلبات',
+} as const;

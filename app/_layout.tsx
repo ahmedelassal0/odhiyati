@@ -1,24 +1,63 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { I18nManager } from 'react-native';
 import 'react-native-reanimated';
+import { Colors } from '@/src/constants/colors';
+import { useSettingsStore } from '@/src/store/settingsStore';
+import { useEffect } from 'react';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+// Force RTL for Arabic
+I18nManager.allowRTL(true);
+I18nManager.forceRTL(true);
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const { loadSettings } = useSettingsStore();
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <>
+      <Stack
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: Colors.background,
+          },
+          headerTintColor: Colors.textPrimary,
+          headerTitleStyle: {
+            fontWeight: '700',
+            fontSize: 18,
+          },
+          contentStyle: {
+            backgroundColor: Colors.background,
+          },
+          animation: 'slide_from_left',
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen
+          name="customer-form"
+          options={{
+            title: 'المشترك',
+            presentation: 'modal',
+            headerTitle: '👤 بيانات المشترك',
+          }}
+        />
+        <Stack.Screen
+          name="cow-form"
+          options={{
+            title: 'البقرة',
+            presentation: 'modal',
+            headerTitle: '🐄 بيانات البقرة',
+          }}
+        />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <StatusBar style="light" />
+    </>
   );
 }
