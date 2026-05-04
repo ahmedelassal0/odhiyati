@@ -1,6 +1,6 @@
-import { Customer, Cow, DistributionResult, DistributionPartResult, Warning, PartKey } from '../types';
 import { PARTS, PARTS_MAP } from '../constants/parts';
-import { getCowPartWeights } from '../database/database';
+import { getCowPartData } from '../database/database';
+import { Cow, Customer, DistributionPartResult, DistributionResult, PartKey, Warning } from '../types';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
@@ -22,7 +22,7 @@ export async function runDistribution(
   // 1. Initialize capacities and weights for all cows
   // cowId -> partKey -> remainingCount
   const cowCapacities = new Map<string, Map<PartKey, number>>();
-  const cowWeights = new Map<string, Record<string, number>>();
+  const cowWeights = new Map<string, Record<string, { weight: number; readiness: 'not_ready' | 'preparing' | 'ready' }>>();
 
   for (const cow of cows) {
     const capacities = new Map<PartKey, number>();
@@ -30,8 +30,8 @@ export async function runDistribution(
       capacities.set(part.key, part.perCow);
     }
     cowCapacities.set(cow.id, capacities);
-    
-    const weights = await getCowPartWeights(cow.id);
+
+    const weights = await getCowPartData(cow.id);
     cowWeights.set(cow.id, weights);
   }
 
@@ -47,7 +47,7 @@ export async function runDistribution(
   // 3. Process customers cow by cow
   for (const cow of cows) {
     const cowCustomers = customersByCow.get(cow.id) || [];
-    
+
     for (const customer of cowCustomers) {
       const partResults: DistributionPartResult[] = [];
 
@@ -61,7 +61,7 @@ export async function runDistribution(
 
         if (remainingInAssigned > 0) {
           assignedCapacities.set(partKey, remainingInAssigned - 1);
-          
+
           // Weight division logic for shared parts (like meat/liver)
           const requestersInCow = cowCustomers.filter(c => c.requestedParts.includes(partKey)).length;
           const shareDivisor = partRule.perCow > 1 ? Math.min(partRule.perCow, requestersInCow) : 1;
@@ -70,29 +70,31 @@ export async function runDistribution(
             partKey,
             label: partRule.label,
             received: true,
-            weight: cowWeights.get(cow.id)?.[partKey] 
-              ? Number((cowWeights.get(cow.id)![partKey] / shareDivisor).toFixed(2))
+            weight: cowWeights.get(cow.id)?.[partKey]?.weight
+              ? Number((cowWeights.get(cow.id)![partKey].weight / shareDivisor).toFixed(2))
               : undefined,
+            readiness: cowWeights.get(cow.id)?.[partKey]?.readiness || (['frontLeg', 'backLeg', 'head'].includes(partKey) ? 'not_ready' : 'ready'),
           });
         } else {
           // B. "Normally" look in other cows (Crossover)
           let foundInCrossover = false;
           for (const otherCow of cows) {
             if (otherCow.id === cow.id) continue;
-            
+
             const otherCapacities = cowCapacities.get(otherCow.id)!;
             const remainingInOther = otherCapacities.get(partKey) || 0;
 
             if (remainingInOther > 0) {
               otherCapacities.set(partKey, remainingInOther - 1);
               foundInCrossover = true;
-              
+
               partResults.push({
                 partKey,
                 label: partRule.label,
                 received: true,
-                weight: cowWeights.get(otherCow.id)?.[partKey],
+                weight: cowWeights.get(otherCow.id)?.[partKey]?.weight,
                 note: `من ${otherCow.name}`,
+                readiness: cowWeights.get(otherCow.id)?.[partKey]?.readiness || (['frontLeg', 'backLeg', 'head'].includes(partKey) ? 'not_ready' : 'ready'),
               });
               break;
             }
@@ -104,6 +106,7 @@ export async function runDistribution(
               label: partRule.label,
               received: false,
               note: 'غير متاح في كل الأبقار',
+              readiness: 'not_ready',
             });
 
             warnings.push({
@@ -191,7 +194,7 @@ export function preCheckWarnings(customers: Customer[], cows: Cow[]): Warning[] 
       warnings.push({
         type: 'shortage',
         partKey,
-        message: `عجز عالمي في ${PARTS_MAP[partKey].label}: مطلوب ${demand} والمتاح في كل الأبقار ${capacity}`,
+        message: `عجز عام في ${PARTS_MAP[partKey].label}: مطلوب ${demand} والمتاح في كل الأبقار ${capacity}`,
         severity: 'high',
       });
     }

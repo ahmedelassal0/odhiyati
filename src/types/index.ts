@@ -25,6 +25,7 @@ export interface CowPart {
   partKey: PartKey;
   weight?: number;      // optional weight in kg
   quantity: number;     // available quantity (1 or 2 for legs)
+  readiness: 'not_ready' | 'preparing' | 'ready';
 }
 
 export interface Cow {
@@ -67,6 +68,7 @@ export interface DistributionPartResult {
   weight?: number;
   note?: string;        // e.g. "from cow 2" for crossover
   delivered?: boolean;  // true if physically delivered to customer
+  readiness: 'not_ready' | 'preparing' | 'ready';
 }
 
 export interface Warning {

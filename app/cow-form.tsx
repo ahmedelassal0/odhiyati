@@ -7,6 +7,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCowStore } from '@/src/store/cowStore';
@@ -21,12 +22,13 @@ export default function CowFormScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const isEdit = !!id;
   
-  const { cows, addCow, updateCow, setCowPartWeight, getCowPartWeights } = useCowStore();
+  const { cows, addCow, updateCow, setCowPartData, getCowPartData } = useCowStore();
   const { customers } = useCustomerStore();
   
   const [name, setName] = useState('');
   const [totalShares, setTotalShares] = useState(DEFAULT_SHARES_PER_COW.toString());
   const [partWeights, setPartWeights] = useState<Record<string, string>>({});
+  const [partReadiness, setPartReadiness] = useState<Record<string, 'not_ready' | 'preparing' | 'ready'>>({});
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -37,13 +39,16 @@ export default function CowFormScreen() {
         setName(cow.name);
         setTotalShares(cow.totalShares.toString());
         
-        // Load weights
-        getCowPartWeights(cow.id).then(weights => {
+        // Load data
+        getCowPartData(cow.id).then(data => {
           const weightStrings: Record<string, string> = {};
-          for (const [key, value] of Object.entries(weights)) {
-            weightStrings[key] = value.toString();
+          const readinessMap: Record<string, 'not_ready' | 'preparing' | 'ready'> = {};
+          for (const [key, value] of Object.entries(data)) {
+            weightStrings[key] = value.weight?.toString() || '';
+            readinessMap[key] = value.readiness;
           }
           setPartWeights(weightStrings);
+          setPartReadiness(readinessMap);
         });
       }
     }
@@ -70,26 +75,30 @@ export default function CowFormScreen() {
           totalShares: parseInt(totalShares),
         });
         
-        // Save part weights
+        // Save part data
         for (const part of PARTS) {
           const weightStr = partWeights[part.key];
           const weight = weightStr ? parseFloat(weightStr) : null;
-          if (weight !== null && !isNaN(weight)) {
-            await setCowPartWeight(id!, part.key, weight);
-          } else {
-            await setCowPartWeight(id!, part.key, null);
-          }
+          const readiness = partReadiness[part.key] || (['frontLeg', 'backLeg', 'head'].includes(part.key) ? 'not_ready' : 'ready');
+          
+          await setCowPartData(id!, part.key, { 
+            weight: (weight !== null && !isNaN(weight)) ? weight : null, 
+            readiness 
+          });
         }
       } else {
         const newCow = await addCow(name.trim(), parseInt(totalShares));
         
-        // Save part weights for new cow
+        // Save part data for new cow
         for (const part of PARTS) {
           const weightStr = partWeights[part.key];
           const weight = weightStr ? parseFloat(weightStr) : null;
-          if (weight !== null && !isNaN(weight)) {
-            await setCowPartWeight(newCow.id, part.key, weight);
-          }
+          const readiness = partReadiness[part.key] || (['frontLeg', 'backLeg', 'head'].includes(part.key) ? 'not_ready' : 'ready');
+
+          await setCowPartData(newCow.id, part.key, {
+            weight: (weight !== null && !isNaN(weight)) ? weight : null,
+            readiness
+          });
         }
       }
       
@@ -156,18 +165,50 @@ export default function CowFormScreen() {
           </Text>
           
           {PARTS.map(part => (
-            <View key={part.key} style={styles.weightRow}>
-              <Text style={styles.weightLabel}>
-                {part.icon} {part.label}
-              </Text>
-              <View style={styles.weightInputContainer}>
-                <Input
-                  value={partWeights[part.key] || ''}
-                  onChangeText={(val) => setPartWeights(prev => ({ ...prev, [part.key]: val }))}
-                  placeholder="كجم"
-                  keyboardType="decimal-pad"
-                  containerStyle={styles.weightInput}
-                />
+            <View key={part.key} style={styles.partCard}>
+              <View style={styles.weightRow}>
+                <Text style={styles.weightLabel}>
+                  {part.icon} {part.label}
+                </Text>
+                <View style={styles.weightInputContainer}>
+                  <Input
+                    value={partWeights[part.key] || ''}
+                    onChangeText={(val) => setPartWeights(prev => ({ ...prev, [part.key]: val }))}
+                    placeholder="كجم"
+                    keyboardType="decimal-pad"
+                    containerStyle={styles.weightInput}
+                  />
+                </View>
+              </View>
+              
+              {/* Readiness Selector */}
+              <View style={styles.readinessContainer}>
+                {[
+                  { id: 'not_ready', label: 'غير جاهز', color: Colors.error },
+                  { id: 'preparing', label: 'بيجهز', color: Colors.warning },
+                  { id: 'ready', label: 'جاهز', color: Colors.success },
+                ].map((status) => {
+                  const currentReadiness = partReadiness[part.key] || (['frontLeg', 'backLeg', 'head'].includes(part.key) ? 'not_ready' : 'ready');
+                  const isActive = currentReadiness === status.id;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={status.id}
+                      style={[
+                        styles.readinessBtn,
+                        isActive && { backgroundColor: status.color + '20', borderColor: status.color }
+                      ]}
+                      onPress={() => setPartReadiness(prev => ({ ...prev, [part.key]: status.id as any }))}
+                    >
+                      <Text style={[
+                        styles.readinessText,
+                        isActive && { color: status.color, fontWeight: '700' }
+                      ]}>
+                        {status.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           ))}
@@ -261,25 +302,51 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   
-  // Weights
+  // Parts
+  partCard: {
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
   weightRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
     gap: 12,
   },
   weightLabel: {
     fontSize: 14,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-    width: 110,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+    width: 100,
     textAlign: 'right',
   },
   weightInputContainer: {
     flex: 1,
   },
   weightInput: {
-    marginBottom: 4,
+    marginBottom: 0,
+  },
+  readinessContainer: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+    marginTop: 4,
+  },
+  readinessBtn: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+  },
+  readinessText: {
+    fontSize: 11,
+    color: Colors.textMuted,
   },
   
   // Subscribers

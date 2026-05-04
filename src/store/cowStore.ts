@@ -16,8 +16,8 @@ interface CowStore {
   updateCow: (id: string, updates: Partial<Pick<Cow, 'name' | 'totalShares' | 'takenShares' | 'status'>>) => Promise<void>;
   deleteCow: (id: string) => Promise<void>;
   getCowById: (id: string) => Cow | undefined;
-  setCowPartWeight: (cowId: string, partKey: string, weight: number | null) => Promise<void>;
-  getCowPartWeights: (cowId: string) => Promise<Record<string, number>>;
+  setCowPartData: (cowId: string, partKey: string, data: { weight: number | null; readiness: 'not_ready' | 'preparing' | 'ready' }) => Promise<void>;
+  getCowPartData: (cowId: string) => Promise<Record<string, { weight: number; readiness: 'not_ready' | 'preparing' | 'ready' }>>;
   recalculateTakenShares: (cowId: string) => Promise<void>;
 }
 
@@ -87,12 +87,15 @@ export const useCowStore = create<CowStore>((set, get) => ({
     return get().cows.find(c => c.id === id);
   },
 
-  setCowPartWeight: async (cowId: string, partKey: string, weight: number | null) => {
-    await db.setCowPartWeight(cowId, partKey, weight);
+  setCowPartData: async (cowId, partKey, data) => {
+    await db.setCowPartData(cowId, partKey, data);
+    // Also update all distribution results if they exist
+    await db.updatePartReadiness(cowId, partKey, data.readiness);
   },
 
-  getCowPartWeights: async (cowId: string) => {
-    return db.getCowPartWeights(cowId);
+  getCowPartData: async (cowId: string) => {
+    const data = await db.getCowPartData(cowId);
+    return data as Record<string, { weight: number; readiness: 'not_ready' | 'preparing' | 'ready' }>;
   },
 
   recalculateTakenShares: async (cowId: string) => {

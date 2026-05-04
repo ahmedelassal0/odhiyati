@@ -27,7 +27,11 @@ export default function DeliveryScreen() {
     setRefreshing(false);
   }, []);
 
-  const handleToggle = async (distributionId: string, partKey: string, currentStatus: boolean) => {
+  const handleToggle = async (distributionId: string, partKey: string, currentStatus: boolean, readiness: string) => {
+    if (readiness !== 'ready' && !currentStatus) {
+      Alert.alert('تنبيه', 'هذا الجزء غير جاهز للتسليم بعد');
+      return;
+    }
     await toggleDelivery(distributionId, partKey, !currentStatus);
   };
 
@@ -35,7 +39,11 @@ export default function DeliveryScreen() {
     const result = results.find(r => r.id === resultId);
     if (!result) return;
     
-    const unDeliveredParts = result.parts.filter(p => p.received && !p.delivered);
+    const unDeliveredParts = result.parts.filter(p => p.received && !p.delivered && p.readiness === 'ready');
+    if (unDeliveredParts.length === 0) {
+      Alert.alert('تنبيه', 'لا توجد أجزاء جاهزة للتسليم حالياً');
+      return;
+    }
     for (const part of unDeliveredParts) {
       await toggleDelivery(resultId, part.partKey, true);
     }
@@ -129,29 +137,54 @@ export default function DeliveryScreen() {
         </View>
 
         <View style={styles.partsList}>
-          {receivedParts.map((part, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.partRow, part.delivered ? styles.partRowDelivered : styles.partRowPending]}
-              onPress={() => handleToggle(item.id, part.partKey, !!part.delivered)}
-            >
-              <View style={[styles.checkbox, part.delivered && styles.checkboxChecked]}>
-                {part.delivered && <Text style={styles.checkIcon}>✓</Text>}
-              </View>
-              <Text style={styles.partIcon}>
-                {PARTS_MAP[part.partKey]?.icon || ''}
-              </Text>
-              <Text style={[styles.partLabel, part.delivered && styles.partLabelDelivered]}>
-                {part.label}
-              </Text>
-              {part.weight && (
-                <Text style={styles.weightText}>{part.weight} كجم</Text>
-              )}
-              {part.note && (
-                <Text style={styles.partNote}>{part.note}</Text>
-              )}
-            </TouchableOpacity>
-          ))}
+          {receivedParts.map((part, index) => {
+            const isReady = part.readiness === 'ready';
+            const isPreparing = part.readiness === 'preparing';
+            const isNotReady = part.readiness === 'not_ready';
+
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.partRow,
+                  part.delivered ? styles.partRowDelivered : styles.partRowPending,
+                  !isReady && !part.delivered && styles.partRowDisabled
+                ]}
+                onPress={() => handleToggle(item.id, part.partKey, !!part.delivered, part.readiness)}
+                disabled={!isReady && !part.delivered}
+              >
+                <View style={[
+                  styles.checkbox,
+                  part.delivered && styles.checkboxChecked,
+                  !isReady && !part.delivered && styles.checkboxDisabled
+                ]}>
+                  {part.delivered && <Text style={styles.checkIcon}>✓</Text>}
+                </View>
+                <Text style={styles.partIcon}>
+                  {PARTS_MAP[part.partKey]?.icon || ''}
+                </Text>
+                <View style={styles.partContent}>
+                  <Text style={[styles.partLabel, part.delivered && styles.partLabelDelivered]}>
+                    {part.label}
+                  </Text>
+                  {!part.delivered && (
+                    <Text style={[
+                      styles.readinessBadge,
+                      isReady ? styles.readinessReady : isPreparing ? styles.readinessPreparing : styles.readinessNotReady
+                    ]}>
+                      {isReady ? 'جاهز' : isPreparing ? 'بيجهز' : 'غير جاهز'}
+                    </Text>
+                  )}
+                </View>
+                {part.weight && (
+                  <Text style={styles.weightText}>{part.weight} كجم</Text>
+                )}
+                {part.note && (
+                  <Text style={styles.partNote}>{part.note}</Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <View style={styles.actionButtonsRow}>
@@ -308,7 +341,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.cardBorder,
   },
   searchIcon: {
     fontSize: 18,
@@ -331,7 +364,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.cardBorder,
     alignItems: 'center',
   },
   statusFilterBtnActive: {
@@ -359,7 +392,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.cardBorder,
     minWidth: 80,
     alignItems: 'center',
   },
@@ -475,6 +508,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#D1FAE5',
     borderColor: Colors.success,
   },
+  partRowDisabled: {
+    opacity: 0.6,
+    backgroundColor: Colors.surface,
+    borderColor: Colors.divider,
+  },
   checkbox: {
     width: 24,
     height: 24,
@@ -489,6 +527,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
+  checkboxDisabled: {
+    borderColor: Colors.textMuted,
+    backgroundColor: 'transparent',
+  },
   checkIcon: {
     color: '#FFF',
     fontSize: 14,
@@ -498,11 +540,37 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginLeft: 8,
   },
-  partLabel: {
+  partContent: {
     flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 8,
+  },
+  partLabel: {
     fontSize: 15,
     color: Colors.textPrimary,
     textAlign: 'right',
+  },
+  readinessBadge: {
+    fontSize: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+    fontWeight: '700',
+  },
+  readinessReady: {
+    backgroundColor: Colors.success + '20',
+    color: Colors.success,
+  },
+  readinessPreparing: {
+    backgroundColor: Colors.warning + '20',
+    color: Colors.warning,
+  },
+  readinessNotReady: {
+    backgroundColor: Colors.error + '20',
+    color: Colors.error,
   },
   partLabelDelivered: {
     color: Colors.success,
@@ -535,7 +603,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.cardBorder,
   },
   actionBtnText: {
     color: Colors.textPrimary,

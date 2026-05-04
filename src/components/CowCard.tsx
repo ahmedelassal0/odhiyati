@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Cow } from '../types';
+import { Cow, PartKey } from '../types';
 import { Badge } from './ui/Badge';
 import { Colors } from '../constants/colors';
+import { useCowStore } from '../store/cowStore';
+import { PARTS_MAP } from '../constants/parts';
+import { useFocusEffect } from 'expo-router';
 
 interface CowCardProps {
   cow: Cow;
@@ -15,6 +18,25 @@ export function CowCard({ cow, subscriberCount = 0, onPress, onDelete }: CowCard
   const progress = cow.totalShares > 0 ? (cow.takenShares / cow.totalShares) : 0;
   const remaining = cow.totalShares - cow.takenShares;
   const isComplete = cow.status === 'complete';
+  const { getCowPartData } = useCowStore();
+  const [partData, setPartData] = React.useState<Record<string, { weight: number; readiness: string }> | null>(null);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      getCowPartData(cow.id).then(setPartData).catch(console.error);
+    }, [cow.id, getCowPartData])
+  );
+
+  const nonReadyParts = React.useMemo(() => {
+    if (!partData) return [];
+    const result = [];
+    for (const [key, value] of Object.entries(partData)) {
+      if (value.readiness === 'not_ready' || value.readiness === 'preparing') {
+        result.push({ key, ...value });
+      }
+    }
+    return result;
+  }, [partData]);
 
   return (
     <TouchableOpacity
@@ -74,6 +96,27 @@ export function CowCard({ cow, subscriberCount = 0, onPress, onDelete }: CowCard
           </Text>
         </View>
       </View>
+
+      {/* Non-Ready Parts */}
+      {nonReadyParts.length > 0 && (
+        <View style={styles.partsContainer}>
+          <Text style={styles.partsTitle}>الأجزاء غير الجاهزة:</Text>
+          <View style={styles.partsList}>
+            {nonReadyParts.map(part => {
+              const rule = PARTS_MAP[part.key as PartKey];
+              const isPreparing = part.readiness === 'preparing';
+              return (
+                <View key={part.key} style={[styles.partBadge, isPreparing ? styles.partBadgePreparing : styles.partBadgeNotReady]}>
+                  <Text style={styles.partIcon}>{rule?.icon}</Text>
+                  <Text style={[styles.partLabel, isPreparing ? styles.partLabelPreparing : styles.partLabelNotReady]}>
+                    {rule?.label} {isPreparing ? '(بيجهز)' : '(غير جاهز)'}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
     </TouchableOpacity>
   );
@@ -172,5 +215,52 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: {
     fontSize: 18,
+  },
+  partsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  partsTitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 8,
+    textAlign: 'right',
+  },
+  partsList: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  partBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 4,
+  },
+  partBadgeNotReady: {
+    backgroundColor: Colors.error + '10',
+    borderColor: Colors.error + '30',
+  },
+  partBadgePreparing: {
+    backgroundColor: Colors.warning + '10',
+    borderColor: Colors.warning + '30',
+  },
+  partIcon: {
+    fontSize: 12,
+  },
+  partLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  partLabelNotReady: {
+    color: Colors.error,
+  },
+  partLabelPreparing: {
+    color: Colors.warning,
   },
 });

@@ -42,6 +42,7 @@ export const useDistributionStore = create<DistributionStore>((set, get) => ({
             weight: p.weight ?? undefined,
             note: p.note ?? undefined,
             delivered: p.delivered === 1,
+            readiness: p.readiness || 'ready',
           })),
           createdAt: row.createdAt,
         });
@@ -74,6 +75,7 @@ export const useDistributionStore = create<DistributionStore>((set, get) => ({
           weight: p.weight,
           note: p.note,
           delivered: p.delivered,
+          readiness: p.readiness,
         })),
       });
     }

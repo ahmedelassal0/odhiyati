@@ -67,6 +67,7 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
       cowId TEXT NOT NULL,
       partKey TEXT NOT NULL,
       weight REAL,
+      readiness TEXT NOT NULL DEFAULT 'ready',
       PRIMARY KEY (cowId, partKey),
       FOREIGN KEY (cowId) REFERENCES cows(id) ON DELETE CASCADE
     );
@@ -95,15 +96,18 @@ async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void
       weight REAL,
       note TEXT,
       delivered INTEGER NOT NULL DEFAULT 0,
+      readiness TEXT NOT NULL DEFAULT 'ready',
       FOREIGN KEY (distributionId) REFERENCES distribution_results(id) ON DELETE CASCADE
     );
   `);
 
   try {
-    await database.execAsync('ALTER TABLE distribution_parts ADD COLUMN delivered INTEGER NOT NULL DEFAULT 0;');
-  } catch (e) {
-    // Column already exists, ignore
-  }
+    await database.execAsync('ALTER TABLE cow_part_weights ADD COLUMN readiness TEXT NOT NULL DEFAULT "ready";');
+  } catch (e) {}
+
+  try {
+    await database.execAsync('ALTER TABLE distribution_parts ADD COLUMN readiness TEXT NOT NULL DEFAULT "ready";');
+  } catch (e) {}
 
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -167,32 +171,33 @@ export async function deleteCow(id: string): Promise<void> {
   await database.runAsync('DELETE FROM cows WHERE id = ?', id);
 }
 
-// ===== COW PART WEIGHTS =====
-export async function setCowPartWeight(cowId: string, partKey: string, weight: number | null): Promise<void> {
+// ===== COW PART DATA (Weights & Readiness) =====
+export async function setCowPartData(
+  cowId: string, 
+  partKey: string, 
+  data: { weight: number | null; readiness: string }
+): Promise<void> {
   const database = await getDatabase();
-  if (weight === null) {
-    await database.runAsync('DELETE FROM cow_part_weights WHERE cowId = ? AND partKey = ?', cowId, partKey);
-  } else {
-    await database.runAsync(
-      'INSERT OR REPLACE INTO cow_part_weights (cowId, partKey, weight) VALUES (?, ?, ?)',
-      cowId,
-      partKey,
-      weight
-    );
-  }
+  await database.runAsync(
+    'INSERT OR REPLACE INTO cow_part_weights (cowId, partKey, weight, readiness) VALUES (?, ?, ?, ?)',
+    cowId,
+    partKey,
+    data.weight,
+    data.readiness
+  );
 }
 
-export async function getCowPartWeights(cowId: string): Promise<Record<string, number>> {
+export async function getCowPartData(cowId: string): Promise<Record<string, { weight: number; readiness: 'not_ready' | 'preparing' | 'ready' }>> {
   const database = await getDatabase();
-  const rows = await database.getAllAsync<{ partKey: string; weight: number }>(
-    'SELECT partKey, weight FROM cow_part_weights WHERE cowId = ?',
+  const rows = await database.getAllAsync<{ partKey: string; weight: number; readiness: 'not_ready' | 'preparing' | 'ready' }>(
+    'SELECT partKey, weight, readiness FROM cow_part_weights WHERE cowId = ?',
     cowId
   );
-  const weights: Record<string, number> = {};
+  const data: Record<string, { weight: number; readiness: 'not_ready' | 'preparing' | 'ready' }> = {};
   for (const row of rows) {
-    weights[row.partKey] = row.weight;
+    data[row.partKey] = { weight: row.weight, readiness: row.readiness };
   }
-  return weights;
+  return data;
 }
 
 // ===== CUSTOMER OPERATIONS =====
@@ -318,6 +323,7 @@ export async function insertDistributionResult(result: {
     weight?: number;
     note?: string;
     delivered?: boolean;
+    readiness: string;
   }>;
 }): Promise<void> {
   const database = await getDatabase();
@@ -333,14 +339,15 @@ export async function insertDistributionResult(result: {
     );
     for (const part of result.parts) {
       await database.runAsync(
-        'INSERT INTO distribution_parts (distributionId, partKey, label, received, weight, note, delivered) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO distribution_parts (distributionId, partKey, label, received, weight, note, delivered, readiness) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         result.id,
         part.partKey,
         part.label,
         part.received ? 1 : 0,
         part.weight ?? null,
         part.note ?? null,
-        part.delivered ? 1 : 0
+        part.delivered ? 1 : 0,
+        part.readiness
       );
     }
   });
@@ -353,6 +360,24 @@ export async function togglePartDelivery(distributionId: string, partKey: string
     delivered ? 1 : 0,
     distributionId,
     partKey
+  );
+}
+
+export async function updatePartReadiness(cowId: string, partKey: string, readiness: string): Promise<void> {
+  const database = await getDatabase();
+  // Update in cow weights/data table
+  await database.runAsync(
+    'UPDATE cow_part_weights SET readiness = ? WHERE cowId = ? AND partKey = ?',
+    readiness,
+    cowId,
+    partKey
+  );
+  // Update in all distribution results for this cow
+  await database.runAsync(
+    'UPDATE distribution_parts SET readiness = ? WHERE partKey = ? AND distributionId IN (SELECT id FROM distribution_results WHERE cowId = ?)',
+    readiness,
+    partKey,
+    cowId
   );
 }
 
