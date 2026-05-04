@@ -50,7 +50,11 @@
       "reactCompiler": true
     },
     "extra": {
-      "supportsRTL": true
+      "supportsRTL": true,
+      "router": {},
+      "eas": {
+        "projectId": "5e8dd8df-7488-411c-aeb8-f70debb9183a"
+      }
     }
   }
 }

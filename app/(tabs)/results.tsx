@@ -19,6 +19,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  TextInput,
 } from 'react-native';
 
 export default function ResultsScreen() {
@@ -28,6 +29,8 @@ export default function ResultsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'customer' | 'cow'>('customer');
   const [exporting, setExporting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCowId, setSelectedCowId] = useState<string | null>(null);
 
   useEffect(() => {
     loadResults();
@@ -40,8 +43,17 @@ export default function ResultsScreen() {
     setRefreshing(false);
   }, []);
 
-  // Group results by cow
-  const resultsByCow = results.reduce((acc, result) => {
+  // Filter results
+  const filteredResults = results.filter(result => {
+    const matchesSearch = 
+      result.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      result.cowName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCow = !selectedCowId || result.cowId === selectedCowId;
+    return matchesSearch && matchesCow;
+  });
+
+  // Group filtered results by cow
+  const resultsByCow = filteredResults.reduce((acc, result) => {
     if (!acc[result.cowId]) {
       acc[result.cowId] = {
         cowName: result.cowName,
@@ -51,6 +63,14 @@ export default function ResultsScreen() {
     acc[result.cowId].results.push(result);
     return acc;
   }, {} as Record<string, { cowName: string; results: typeof results }>);
+
+  // Get unique cows for filter
+  const uniqueCows = results.reduce((acc, result) => {
+    if (!acc.find(c => c.id === result.cowId)) {
+      acc.push({ id: result.cowId, name: result.cowName });
+    }
+    return acc;
+  }, [] as { id: string; name: string }[]);
 
   const handleExportPdf = async () => {
     if (results.length === 0) return;
@@ -127,6 +147,46 @@ export default function ResultsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Search & Filters */}
+      <View style={styles.filterSection}>
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="بحث عن مشترك أو بقرة..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={Colors.textMuted}
+          />
+        </View>
+
+        <View style={styles.cowFiltersContainer}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={[{ id: null, name: 'الكل' }, ...uniqueCows]}
+            keyExtractor={item => item.id || 'all'}
+            contentContainerStyle={styles.cowFilterList}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.cowFilterBtn,
+                  selectedCowId === item.id && styles.cowFilterBtnActive
+                ]}
+                onPress={() => setSelectedCowId(item.id)}
+              >
+                <Text style={[
+                  styles.cowFilterText,
+                  selectedCowId === item.id && styles.cowFilterTextActive
+                ]}>
+                  {item.id ? `🐄 ${item.name}` : item.name}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </View>
+
       {/* View Mode Toggle */}
       <View style={styles.toggleContainer}>
         <TouchableOpacity
@@ -167,7 +227,7 @@ export default function ResultsScreen() {
       {/* Results */}
       {viewMode === 'customer' ? (
         <FlatList
-          data={results}
+          data={filteredResults}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <DistributionResultCard
@@ -233,10 +293,67 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
 
+  // Filters
+  filterSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
+  },
+  searchContainer: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    color: Colors.textPrimary,
+    textAlign: 'right',
+    fontSize: 14,
+  },
+  cowFiltersContainer: {
+    height: 36,
+  },
+  cowFilterList: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+  },
+  cowFilterBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  cowFilterBtnActive: {
+    backgroundColor: Colors.primaryDark,
+    borderColor: Colors.primary,
+  },
+  cowFilterText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  cowFilterTextActive: {
+    color: '#FFF',
+  },
+
   // Toggle
   toggleContainer: {
     flexDirection: 'row-reverse',
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 8,
     backgroundColor: Colors.surface,
     borderRadius: 12,

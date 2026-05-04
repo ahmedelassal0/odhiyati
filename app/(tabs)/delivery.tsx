@@ -13,6 +13,8 @@ export default function DeliveryScreen() {
   const { customers, loadCustomers } = useCustomerStore();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'delivered' | 'partial' | 'pending'>('all');
+  const [selectedCowId, setSelectedCowId] = useState<string | null>(null);
 
   useEffect(() => {
     loadResults();
@@ -179,22 +181,100 @@ export default function DeliveryScreen() {
     );
   }
 
-  const filteredResults = results.filter(r => 
-    r.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.cowName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredResults = results.filter(r => {
+    const matchesSearch = 
+      r.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.cowName.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesCow = !selectedCowId || r.cowId === selectedCowId;
+
+    const receivedParts = r.parts.filter(p => p.received);
+    const allDelivered = receivedParts.length > 0 && receivedParts.every(p => p.delivered);
+    const someDelivered = receivedParts.some(p => p.delivered);
+    const noneDelivered = receivedParts.every(p => !p.delivered);
+
+    let matchesStatus = true;
+    if (statusFilter === 'delivered') matchesStatus = allDelivered;
+    else if (statusFilter === 'partial') matchesStatus = someDelivered && !allDelivered;
+    else if (statusFilter === 'pending') matchesStatus = noneDelivered;
+
+    return matchesSearch && matchesCow && matchesStatus;
+  });
+
+  // Get unique cows for filter
+  const uniqueCows = results.reduce((acc, result) => {
+    if (!acc.find(c => c.id === result.cowId)) {
+      acc.push({ id: result.cowId, name: result.cowName });
+    }
+    return acc;
+  }, [] as { id: string; name: string }[]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="ابحث عن مشترك أو بقرة..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor={Colors.textMuted}
-        />
+      <View style={styles.filterSection}>
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="ابحث عن مشترك أو بقرة..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={Colors.textMuted}
+          />
+        </View>
+
+        <View style={styles.statusFilters}>
+          {[
+            { id: 'all', label: 'الكل' },
+            { id: 'pending', label: 'لم يستلم' },
+            { id: 'partial', label: 'جزئي' },
+            { id: 'delivered', label: 'مكتمل' },
+          ].map(filter => (
+            <TouchableOpacity
+              key={filter.id}
+              style={[
+                styles.statusFilterBtn,
+                statusFilter === filter.id && styles.statusFilterBtnActive,
+              ]}
+              onPress={() => setStatusFilter(filter.id as any)}
+            >
+              <Text
+                style={[
+                  styles.statusFilterText,
+                  statusFilter === filter.id && styles.statusFilterTextActive,
+                ]}
+              >
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.cowFiltersContainer}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={[{ id: null, name: 'كل الأبقار' }, ...uniqueCows]}
+            keyExtractor={item => item.id || 'all'}
+            contentContainerStyle={styles.cowFilterList}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.cowFilterBtn,
+                  selectedCowId === item.id && styles.cowFilterBtnActive
+                ]}
+                onPress={() => setSelectedCowId(item.id)}
+              >
+                <Text style={[
+                  styles.cowFilterText,
+                  selectedCowId === item.id && styles.cowFilterTextActive
+                ]}>
+                  {item.id ? `🐄 ${item.name}` : item.name}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
       </View>
 
       <FlatList
@@ -216,12 +296,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  filterSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
+  },
   searchContainer: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    margin: 16,
-    marginBottom: 0,
     paddingHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
@@ -234,10 +317,63 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 48,
-    fontFamily: 'Arial',
     fontSize: 15,
     color: Colors.textPrimary,
     textAlign: 'right',
+  },
+  statusFilters: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+  },
+  statusFilterBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  statusFilterBtnActive: {
+    backgroundColor: Colors.primaryDark,
+    borderColor: Colors.primary,
+  },
+  statusFilterText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  statusFilterTextActive: {
+    color: '#FFF',
+  },
+  cowFiltersContainer: {
+    height: 36,
+  },
+  cowFilterList: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+  },
+  cowFilterBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  cowFilterBtnActive: {
+    backgroundColor: Colors.primaryDark,
+    borderColor: Colors.primary,
+  },
+  cowFilterText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  cowFilterTextActive: {
+    color: '#FFF',
   },
   list: {
     padding: 16,

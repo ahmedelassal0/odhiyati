@@ -176,10 +176,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.primaryLight,
   },
-  partChipText: {
-    fontSize: 12,
-    color: Colors.primaryLight,
-  },
   deleteBtn: {
     padding: 4,
   },
