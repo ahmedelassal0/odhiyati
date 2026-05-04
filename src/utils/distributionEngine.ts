@@ -63,15 +63,18 @@ export async function runDistribution(
           assignedCapacities.set(partKey, remainingInAssigned - 1);
 
           // Weight division logic for shared parts (like meat/liver)
-          const requestersInCow = cowCustomers.filter(c => c.requestedParts.includes(partKey)).length;
-          const shareDivisor = partRule.perCow > 1 ? Math.min(partRule.perCow, requestersInCow) : 1;
+          const requestersInCow = cowCustomers.filter(c => c.requestedParts.includes(partKey));
+          const totalSharesInCow = requestersInCow.reduce((sum, c) => sum + c.shares, 0);
+          
+          // The divisor is the total number of portions (shares) this part is split into
+          const shareDivisor = partRule.perCow > 1 ? totalSharesInCow : 1;
 
           partResults.push({
             partKey,
             label: partRule.label,
             received: true,
             weight: cowWeights.get(cow.id)?.[partKey]?.weight
-              ? Number((cowWeights.get(cow.id)![partKey].weight / shareDivisor).toFixed(2))
+              ? Number(((cowWeights.get(cow.id)![partKey].weight / shareDivisor) * customer.shares).toFixed(2))
               : undefined,
             readiness: cowWeights.get(cow.id)?.[partKey]?.readiness || (['frontLeg', 'backLeg', 'head'].includes(partKey) ? 'not_ready' : 'ready'),
           });

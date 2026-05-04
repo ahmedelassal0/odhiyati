@@ -101,14 +101,18 @@ export default function CowsScreen() {
       <FlatList
         data={cows}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <CowCard
-            cow={item}
-            subscriberCount={getSubscriberCount(item.id)}
-            onPress={() => router.push(`/cow-form?id=${item.id}`)}
-            onDelete={() => handleDelete(item)}
-          />
-        )}
+        renderItem={({ item }) => {
+          const cowCustomers = customers.filter(c => c.cowId === item.id);
+          return (
+            <CowCard
+              cow={item}
+              subscriberCount={cowCustomers.length}
+              cowCustomers={cowCustomers}
+              onPress={() => router.push(`/cow-form?id=${item.id}`)}
+              onDelete={() => handleDelete(item)}
+            />
+          );
+        }}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         refreshControl={

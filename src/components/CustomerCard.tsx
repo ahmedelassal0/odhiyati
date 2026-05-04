@@ -84,6 +84,13 @@ export function CustomerCard({ customer, cowName, onPress, onDelete }: CustomerC
         </View>
       )}
 
+      {/* Notes */}
+      {customer.notes ? (
+        <View style={styles.notesRow}>
+          <Text style={styles.notesText}>📝 {customer.notes}</Text>
+        </View>
+      ) : null}
+
     </TouchableOpacity>
   );
 }
@@ -181,5 +188,17 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: {
     fontSize: 18,
+  },
+  notesRow: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.cardBorder,
+  },
+  notesText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'right',
   },
 });

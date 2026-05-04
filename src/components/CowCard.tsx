@@ -1,20 +1,21 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Cow, PartKey } from '../types';
+import { Cow, PartKey, Customer } from '../types';
 import { Badge } from './ui/Badge';
 import { Colors } from '../constants/colors';
 import { useCowStore } from '../store/cowStore';
-import { PARTS_MAP } from '../constants/parts';
+import { PARTS, PARTS_MAP } from '../constants/parts';
 import { useFocusEffect } from 'expo-router';
 
 interface CowCardProps {
   cow: Cow;
   subscriberCount?: number;
+  cowCustomers?: Customer[];
   onPress?: () => void;
   onDelete?: () => void;
 }
 
-export function CowCard({ cow, subscriberCount = 0, onPress, onDelete }: CowCardProps) {
+export function CowCard({ cow, subscriberCount = 0, cowCustomers = [], onPress, onDelete }: CowCardProps) {
   const progress = cow.totalShares > 0 ? (cow.takenShares / cow.totalShares) : 0;
   const remaining = cow.totalShares - cow.takenShares;
   const isComplete = cow.status === 'complete';
@@ -37,6 +38,26 @@ export function CowCard({ cow, subscriberCount = 0, onPress, onDelete }: CowCard
     }
     return result;
   }, [partData]);
+
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
+  const sharingInfo = React.useMemo(() => {
+    return PARTS.map(partRule => {
+      const requestersInCow = cowCustomers.filter(c => c.requestedParts.includes(partRule.key));
+      const totalRequestedShares = requestersInCow.reduce((sum, c) => sum + c.shares, 0);
+      
+      // If the part is shared (like meat/liver), it's divided by the total shares requesting it
+      // capped at the cow's total capacity if necessary (though usually capacity is 7 shares)
+      const divisor = partRule.perCow > 1 ? totalRequestedShares : 1;
+      
+      return {
+        ...partRule,
+        requesters: requestersInCow.length,
+        totalShares: totalRequestedShares,
+        divisor: divisor
+      };
+    });
+  }, [cowCustomers]);
 
   return (
     <TouchableOpacity
@@ -117,6 +138,39 @@ export function CowCard({ cow, subscriberCount = 0, onPress, onDelete }: CowCard
           </View>
         </View>
       )}
+
+      {/* Sharing Details Collapsible */}
+      <View style={styles.sharingSection}>
+        <TouchableOpacity 
+          style={styles.sharingToggle} 
+          onPress={(e) => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+        >
+          <Text style={styles.sharingToggleText}>
+            {isExpanded ? 'إخفاء تفاصيل التقسيم ▲' : 'عرض تفاصيل التقسيم ▼'}
+          </Text>
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View style={styles.sharingList}>
+            {sharingInfo.map(item => (
+              <View key={item.key} style={styles.sharingRow}>
+                <Text style={styles.sharingRowLabel}>{item.icon} {item.label}</Text>
+                <View style={styles.sharingRowValueContainer}>
+                  <Text style={styles.sharingRowDemand}>مطلوب: {item.requesters}</Text>
+                  <Badge 
+                    text={`يُقسم على ${item.divisor}`}
+                    variant={item.requesters > item.perCow ? 'error' : item.requesters > 0 ? 'success' : 'info'}
+                    size="small"
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
 
     </TouchableOpacity>
   );
@@ -262,5 +316,48 @@ const styles = StyleSheet.create({
   },
   partLabelPreparing: {
     color: Colors.warning,
+  },
+  
+  // Sharing Section
+  sharingSection: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+    paddingTop: 8,
+  },
+  sharingToggle: {
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  sharingToggleText: {
+    fontSize: 12,
+    color: Colors.primaryLight,
+    fontWeight: '700',
+  },
+  sharingList: {
+    marginTop: 8,
+    gap: 6,
+  },
+  sharingRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.divider + '40',
+  },
+  sharingRowLabel: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'right',
+  },
+  sharingRowValueContainer: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sharingRowDemand: {
+    fontSize: 11,
+    color: Colors.textMuted,
   },
 });
